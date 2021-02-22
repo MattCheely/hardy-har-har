@@ -1,4 +1,4 @@
-module Shared exposing (Model, Msg, harLog, init, requestFileView, update)
+module Shared exposing (HarData, Model, Msg, data, init, requestFileView, update)
 
 import File exposing (File)
 import File.Select as Select
@@ -15,7 +15,13 @@ import Task
 
 type Model
     = NoData (Maybe LoadError)
-    | Loaded Har.Log
+    | Loaded HarData
+
+
+type alias HarData =
+    { name : String
+    , log : Har.Log
+    }
 
 
 type alias LoadError =
@@ -29,14 +35,14 @@ init _ =
     ( NoData Nothing, Cmd.none )
 
 
-harLog : Model -> Maybe Har.Log
-harLog model =
+data : Model -> Maybe HarData
+data model =
     case model of
         NoData _ ->
             Nothing
 
-        Loaded log ->
-            Just log
+        Loaded harFile ->
+            Just harFile
 
 
 
@@ -65,7 +71,12 @@ update msg model =
         FileStringified file fileText ->
             case decodeString Har.decoder fileText of
                 Ok log ->
-                    ( Loaded log, Cmd.none )
+                    ( Loaded
+                        { name = File.name file
+                        , log = log
+                        }
+                    , Cmd.none
+                    )
 
                 Err error ->
                     ( NoData (Just { file = file, error = error })

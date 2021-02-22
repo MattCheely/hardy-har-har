@@ -1,12 +1,15 @@
 module Main exposing (main)
 
 import Browser exposing (Document)
+import Dict
 import Duplicates
 import Har
 import Html exposing (..)
+import Html.Attributes exposing (class)
 import Html.Events exposing (onClick)
 import Redact
-import Shared
+import Shared exposing (HarData)
+import Timeline
 
 
 
@@ -23,6 +26,7 @@ type alias Model =
 
 type View
     = Overview
+    | LoadFile
     | Duplicates
     | Redact
 
@@ -81,21 +85,27 @@ update msg model =
 
 body : Model -> List (Html Msg)
 body model =
-    case Shared.harLog model.shared of
-        Just log ->
+    case Shared.data model.shared of
+        Just harData ->
             [ menuView
-            , actionView log model
+            , actionView harData model
             ]
 
         Nothing ->
             [ loadFileView model ]
 
 
-actionView : Har.Log -> Model -> Html Msg
-actionView log model =
+actionView : HarData -> Model -> Html Msg
+actionView { name, log } model =
     case model.viewing of
+        LoadFile ->
+            loadFileView model
+
         Overview ->
-            text "Loaded"
+            div []
+                [ summaryView name log
+                , Timeline.view log
+                ]
 
         Duplicates ->
             Duplicates.view log model.duplicateState
@@ -109,11 +119,46 @@ actionView log model =
 menuView : Html Msg
 menuView =
     div []
-        [ button [ onClick (SelectView Duplicates) ] [ text "Find Duplicate Requests" ]
+        [ text " | "
+        , a [ onClick (SelectView Overview), class "tertiary" ] [ text "Summary" ]
+        , text " | "
+        , a [ onClick (SelectView Duplicates), class "tertiary" ] [ text "Duplicate Requests" ]
+        , text " | "
+        , a [ onClick (SelectView Redact), class "tertiary" ] [ text "Redact Data" ]
+        , text " | "
+        , button [ onClick (SelectView LoadFile), class "tertiary" ] [ text "Load A Different File" ]
+        ]
+
+
+summaryView : String -> Har.Log -> Html Msg
+summaryView fileName log =
+    let
+        pageCount =
+            Dict.size log.pages
+
+        requestCount =
+            List.length log.entries
+
+        pageText =
+            if pageCount == 1 then
+                " on a single page"
+
+            else
+                " spanning " ++ String.fromInt pageCount ++ " pages"
+
+        requestText =
+            if requestCount == 1 then
+                "request"
+
+            else
+                "requests"
+    in
+    div []
+        [ h2 [] [ text fileName ]
+        , text (String.fromInt requestCount)
         , text " "
-        , button [ onClick (SelectView Redact) ] [ text "Redact Data" ]
-        , text " "
-        , button [] [ text "Load A New File" ]
+        , text requestText
+        , text pageText
         ]
 
 
