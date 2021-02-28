@@ -5,4 +5,7 @@ if (BUILD_MODE == "development") {
   console.log("doing development stuff");
 }
 
-const app = Elm.Main.init({});
+let height = document.documentElement.clientHeight;
+let width = document.documentElement.clientWidth;
+
+const app = Elm.Main.init({ flags: { width: width, height: height } });

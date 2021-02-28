@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser exposing (Document)
+import Browser.Events exposing (onResize)
 import Dict
 import Duplicates
 import Har
@@ -21,6 +22,7 @@ type alias Model =
     , viewing : View
     , duplicateState : Duplicates.Model
     , redactState : Redact.Model
+    , windowSize : ( Int, Int )
     }
 
 
@@ -31,18 +33,21 @@ type View
     | Redact
 
 
-init : () -> ( Model, Cmd Msg )
+type alias Flags =
+    { width : Int
+    , height : Int
+    }
+
+
+init : Flags -> ( Model, Cmd Msg )
 init flags =
-    let
-        ( sharedModel, sharedCmd ) =
-            Shared.init flags
-    in
-    ( { shared = sharedModel
+    ( { shared = Shared.init
       , viewing = Overview
       , duplicateState = Duplicates.init
       , redactState = Redact.init
+      , windowSize = ( flags.width, flags.height )
       }
-    , Cmd.map SharedMsg sharedCmd
+    , Cmd.none
     )
 
 
@@ -55,11 +60,15 @@ type Msg
     | SharedMsg Shared.Msg
     | DuplicatesMsg Duplicates.Msg
     | RedactMsg Redact.Msg
+    | SizeChange Int Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SizeChange width height ->
+            ( { model | windowSize = ( width, height ) }, Cmd.none )
+
         SharedMsg sharedMsg ->
             let
                 ( sharedModel, sharedCmd ) =
@@ -104,7 +113,7 @@ actionView { name, log } model =
         Overview ->
             div []
                 [ summaryView name log
-                , Timeline.view log
+                , Timeline.view log model.windowSize
                 ]
 
         Duplicates ->
@@ -179,15 +188,15 @@ view model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions =
-    always Sub.none
+subscriptions model =
+    onResize SizeChange
 
 
 
 -- MAIN
 
 
-main : Program () Model Msg
+main : Program Flags Model Msg
 main =
     Browser.document
         { init = init

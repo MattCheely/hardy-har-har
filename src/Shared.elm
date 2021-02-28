@@ -1,5 +1,6 @@
 module Shared exposing (HarData, Model, Msg, data, init, requestFileView, update)
 
+import Browser
 import File exposing (File)
 import File.Select as Select
 import Har
@@ -30,9 +31,9 @@ type alias LoadError =
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( NoData Nothing, Cmd.none )
+init : Model
+init =
+    NoData Nothing
 
 
 data : Model -> Maybe HarData
