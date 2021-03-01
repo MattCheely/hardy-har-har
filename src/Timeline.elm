@@ -6,8 +6,7 @@ import List.Extra as List
 import Scale exposing (BandScale, ContinuousScale, defaultBandConfig)
 import Time exposing (posixToMillis)
 import TypedSvg exposing (g, line, rect, style, svg, text_)
-import TypedSvg.Attributes exposing (class, dominantBaseline, fill, stroke, strokeWidth, textAnchor, viewBox, x, x1, x2, y, y1, y2)
-import TypedSvg.Attributes.InPx exposing (height, width)
+import TypedSvg.Attributes exposing (class, dominantBaseline, fill, height, stroke, strokeWidth, textAnchor, viewBox, width, x, x1, x2, y, y1, y2)
 import TypedSvg.Core as Svg exposing (Svg, attribute, text)
 import TypedSvg.Events exposing (onMouseEnter, onMouseLeave)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..), percent, px)
@@ -37,7 +36,7 @@ type alias ReqDatum =
 
 type alias Config =
     { pxPerSec : Int
-    , topPadding : Float
+    , yPadding : Float
     , textColor : Color
     , bgColor : Color
     , reqColor : Color
@@ -55,7 +54,7 @@ type alias Config =
 config : Config
 config =
     { pxPerSec = Ui.line * 6
-    , topPadding = toFloat Ui.line
+    , yPadding = toFloat Ui.line
     , textColor = color.text
     , bgColor = color.background
     , reqColor = color.buttonPrimary
@@ -66,7 +65,7 @@ config =
     , tickTextSpacing = 5
     , majorGridColor = Color.rgba 0 0 0 0.4
     , minorGridColor = Color.rgba 0 0 0 0.1
-    , pagePadding = 16 -- Set incorrectly as a kludge to deal with incomplete viewport tracking (probably related to scrollbars)
+    , pagePadding = 16 -- Set incorrectly as a kludge to deal with incomplete viewport tracking (probably related to scrollbars or aspect ratio scaling)
     }
 
 
@@ -120,7 +119,10 @@ view log ( winWidth, _ ) model =
         yScale =
             Scale.linear ( 0, yMax ) ( 0, latestTime )
     in
-    svg [ viewBox 0 -config.topPadding xMax yMax, height yMax ]
+    svg
+        [ viewBox 0 -config.yPadding xMax (yMax + 2 * config.yPadding)
+        , height (px (yMax + 2 * config.yPadding))
+        ]
         [ style [] [ text """
             .column rect { opacity: 0.8; }
             .column:hover rect { opacity: 1; }
@@ -153,12 +155,20 @@ request reqScale tScale focusedRequest datum =
         ]
         (rect
             [ x (px (Scale.convert reqScale datum))
-            , y (px (Scale.convert tScale datum.startTime))
-            , width (Scale.bandwidth reqScale)
-            , height (max 2 (Scale.convert tScale (datum.endTime - datum.startTime)))
-            , fill (Paint fillColor)
+            , y (px 0)
+            , width (px (Scale.bandwidth reqScale))
+            , height (percent 100)
+            , fill (Paint (Color.rgba 0 0 0 0))
             ]
             []
+            :: rect
+                [ x (px (Scale.convert reqScale datum))
+                , y (px (Scale.convert tScale datum.startTime))
+                , width (px (Scale.bandwidth reqScale))
+                , height (px (max 2 (Scale.convert tScale (datum.endTime - datum.startTime))))
+                , fill (Paint fillColor)
+                ]
+                []
             :: (if focused then
                     focusedDecorators reqScale tScale datum
 
@@ -205,7 +215,7 @@ focusedDecorators reqScale tScale datum =
     in
     [ line
         [ class [ "req-mark" ]
-        , x1 (px config.longTickLen)
+        , x1 (px 0)
         , x2 (px (reqEdge - config.tickTextSpacing))
         , y1 (px startPos)
         , y2 (px startPos)
@@ -222,7 +232,7 @@ focusedDecorators reqScale tScale datum =
         [ text (timeLabel datum.startTime) ]
     , line
         [ class [ "req-mark" ]
-        , x1 (px config.longTickLen)
+        , x1 (px 0)
         , x2 (px (reqEdge - config.tickTextSpacing))
         , y1 (px endPos)
         , y2 (px endPos)

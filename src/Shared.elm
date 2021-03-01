@@ -1,6 +1,5 @@
 module Shared exposing (HarData, Model, Msg, data, init, requestFileView, update)
 
-import Browser
 import File exposing (File)
 import File.Select as Select
 import Har

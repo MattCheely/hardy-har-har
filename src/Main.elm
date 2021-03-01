@@ -76,8 +76,17 @@ update msg model =
             let
                 ( sharedModel, sharedCmd ) =
                     Shared.update sharedMsg model.shared
+
+                newView =
+                    if Shared.data sharedModel /= Shared.data model.shared then
+                        Overview
+
+                    else
+                        model.viewing
             in
-            ( { model | shared = sharedModel }, Cmd.map SharedMsg sharedCmd )
+            ( { model | shared = sharedModel, viewing = newView }
+            , Cmd.map SharedMsg sharedCmd
+            )
 
         SelectView newView ->
             ( { model | viewing = newView }, Cmd.none )
