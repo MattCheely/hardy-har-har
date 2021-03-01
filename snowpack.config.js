@@ -7,7 +7,7 @@ module.exports = {
     public: "/",
     src: "/src"
   },
-  plugins: ["snowpack-plugin-elm"],
+  plugins: [["snowpack-plugin-elm", { debugger: "never" }]],
   optimize: {
     bundle: true,
     minify: true,

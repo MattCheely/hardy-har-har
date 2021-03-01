@@ -1,4 +1,4 @@
-module Ui exposing (color, line)
+module Ui exposing (color, fontSize, line)
 
 import Color exposing (Color)
 

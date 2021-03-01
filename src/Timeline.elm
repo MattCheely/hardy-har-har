@@ -1,4 +1,4 @@
-module Timeline exposing (view)
+module Timeline exposing (Model, Msg, init, update, view)
 
 import Color exposing (Color)
 import Har
@@ -6,11 +6,22 @@ import List.Extra as List
 import Scale exposing (BandScale, ContinuousScale, defaultBandConfig)
 import Time exposing (posixToMillis)
 import TypedSvg exposing (g, line, rect, style, svg, text_)
-import TypedSvg.Attributes exposing (class, dominantBaseline, fill, stroke, strokeWidth, viewBox, x, x1, x2, y, y1, y2)
+import TypedSvg.Attributes exposing (class, dominantBaseline, fill, stroke, strokeWidth, textAnchor, viewBox, x, x1, x2, y, y1, y2)
 import TypedSvg.Attributes.InPx exposing (height, width)
-import TypedSvg.Core exposing (Svg, attribute, text)
+import TypedSvg.Core as Svg exposing (Svg, attribute, text)
+import TypedSvg.Events exposing (onMouseEnter, onMouseLeave)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..), percent, px)
 import Ui exposing (color)
+
+
+type alias Model =
+    { focusedRequest : Maybe Int
+    }
+
+
+init : Model
+init =
+    { focusedRequest = Nothing }
 
 
 {-| Consolidated request data for graphing. We derive an id field from the
@@ -30,6 +41,7 @@ type alias Config =
     , textColor : Color
     , bgColor : Color
     , reqColor : Color
+    , reqHighlightColor : Color
     , textOutline : Float
     , shortTickLen : Float
     , longTickLen : Float
@@ -46,7 +58,8 @@ config =
     , topPadding = toFloat Ui.line
     , textColor = color.text
     , bgColor = color.background
-    , reqColor = color.buttonTertiary
+    , reqColor = color.buttonPrimary
+    , reqHighlightColor = color.buttonTertiary
     , textOutline = 10
     , shortTickLen = 5
     , longTickLen = 10
@@ -57,12 +70,32 @@ config =
     }
 
 
-view : Har.Log -> ( Int, Int ) -> Svg msg
-view log ( winWidth, _ ) =
-    let
-        width =
-            Debug.log "Width" winWidth
 
+-- UPDATE
+
+
+type Msg
+    = MouseEnterRequest Int
+    | MouseLeaveRequest
+
+
+update : Msg -> Model -> Model
+update msg model =
+    case msg of
+        MouseEnterRequest id ->
+            { model | focusedRequest = Just id }
+
+        MouseLeaveRequest ->
+            { model | focusedRequest = Nothing }
+
+
+
+-- VIEW
+
+
+view : Har.Log -> ( Int, Int ) -> Model -> Svg Msg
+view log ( winWidth, _ ) model =
+    let
         data =
             generateData log
 
@@ -95,26 +128,128 @@ view log ( winWidth, _ ) =
         , msAxis yScale latestTime
         , g [ class [ "series" ] ]
             (data
-                |> List.map (request xScale yScale)
+                |> List.map (request xScale yScale model.focusedRequest)
             )
         ]
 
 
-request : BandScale ReqDatum -> ContinuousScale Float -> ReqDatum -> Svg msg
-request reqScale tScale datum =
-    g [ class [ "column" ] ]
-        [ rect
-            [ x <| px (Scale.convert reqScale datum)
-            , y <| px (Scale.convert tScale datum.startTime)
-            , width <| Scale.bandwidth reqScale
-            , height <| Scale.convert tScale datum.endTime
-            , fill (Paint config.reqColor)
+request : BandScale ReqDatum -> ContinuousScale Float -> Maybe Int -> ReqDatum -> Svg Msg
+request reqScale tScale focusedRequest datum =
+    let
+        focused =
+            Just datum.id == focusedRequest
+
+        fillColor =
+            if focused then
+                config.reqHighlightColor
+
+            else
+                config.reqColor
+    in
+    g
+        [ class [ "column" ]
+        , onMouseEnter (MouseEnterRequest datum.id)
+        , onMouseLeave MouseLeaveRequest
+        ]
+        (rect
+            [ x (px (Scale.convert reqScale datum))
+            , y (px (Scale.convert tScale datum.startTime))
+            , width (Scale.bandwidth reqScale)
+            , height (max 2 (Scale.convert tScale (datum.endTime - datum.startTime)))
+            , fill (Paint fillColor)
             ]
             []
+            :: (if focused then
+                    focusedDecorators reqScale tScale datum
+
+                else
+                    []
+               )
+        )
+
+
+focusedDecorators : BandScale ReqDatum -> ContinuousScale Float -> ReqDatum -> List (Svg Msg)
+focusedDecorators reqScale tScale datum =
+    let
+        startPos =
+            Scale.convert tScale datum.startTime
+
+        endPos =
+            Scale.convert tScale datum.endTime
+
+        midPos =
+            Scale.convert tScale ((datum.startTime + datum.endTime) / 2)
+
+        reqEdge =
+            Scale.convert reqScale datum
+
+        markColor =
+            config.reqHighlightColor
+
+        height =
+            endPos - startPos
+
+        ( startAlign, endAlign ) =
+            if height < toFloat Ui.fontSize then
+                ( DominantBaselineAuto, DominantBaselineHanging )
+
+            else
+                ( DominantBaselineMiddle, DominantBaselineMiddle )
+
+        textOffset =
+            if height < config.textOutline then
+                config.textOutline / 2
+
+            else
+                0
+    in
+    [ line
+        [ class [ "req-mark" ]
+        , x1 (px config.longTickLen)
+        , x2 (px (reqEdge - config.tickTextSpacing))
+        , y1 (px startPos)
+        , y2 (px startPos)
+        , stroke (Paint markColor)
         ]
+        []
+    , outlinedText
+        [ class [ "req-start-time" ]
+        , x (px (config.longTickLen * 2 + config.tickTextSpacing))
+        , y (px (startPos - textOffset))
+        , dominantBaseline startAlign
+        , fill (Paint markColor)
+        ]
+        [ text (timeLabel datum.startTime) ]
+    , line
+        [ class [ "req-mark" ]
+        , x1 (px config.longTickLen)
+        , x2 (px (reqEdge - config.tickTextSpacing))
+        , y1 (px endPos)
+        , y2 (px endPos)
+        , stroke (Paint markColor)
+        ]
+        []
+    , outlinedText
+        [ class [ "req-end-time" ]
+        , x (px (config.longTickLen * 2 + config.tickTextSpacing))
+        , y (px (endPos + textOffset))
+        , dominantBaseline endAlign
+        , fill (Paint markColor)
+        ]
+        [ text (timeLabel datum.endTime) ]
+    , outlinedText
+        [ class [ "req-duration" ]
+        , x (px (reqEdge - config.tickTextSpacing))
+        , y (px midPos)
+        , textAnchor AnchorEnd
+        , dominantBaseline DominantBaselineMiddle
+        , fill (Paint markColor)
+        ]
+        [ text (timeLabel (datum.endTime - datum.startTime)) ]
+    ]
 
 
-msAxis : ContinuousScale Float -> Float -> Svg msg
+msAxis : ContinuousScale Float -> Float -> Svg Msg
 msAxis scale maxTime =
     let
         majorTicks =
@@ -133,7 +268,7 @@ msAxis scale maxTime =
         )
 
 
-majorTick : ContinuousScale Float -> Int -> Svg msg
+majorTick : ContinuousScale Float -> Int -> Svg Msg
 majorTick scale sec =
     let
         yPos =
@@ -153,18 +288,6 @@ majorTick scale sec =
             , stroke (Paint config.majorGridColor)
             ]
             []
-        , text_
-            [ x (px (tickLen + config.tickTextSpacing))
-            , y (px yPos)
-            , dominantBaseline DominantBaselineMiddle
-            , fill (Paint config.textColor)
-            , stroke (Paint config.bgColor)
-            , strokeWidth (px config.textOutline)
-            , attribute "role" "presentation"
-            ]
-            [ text (String.fromInt sec)
-            , text "s"
-            ]
         , line
             [ x1 (px 0)
             , x2 (px tickLen)
@@ -173,14 +296,13 @@ majorTick scale sec =
             , stroke (Paint config.textColor)
             ]
             []
-        , text_
+        , outlinedText
             [ x (px (tickLen + config.tickTextSpacing))
             , y (px yPos)
             , dominantBaseline DominantBaselineMiddle
             , fill (Paint config.textColor)
             ]
-            [ text (String.fromInt sec)
-            , text "s"
+            [ text (timeLabel (toFloat (sec * 1000)))
             ]
 
         {- This requires some more math to position correctly for longer labels, and our
@@ -198,7 +320,56 @@ majorTick scale sec =
         ]
 
 
-fineTick : ContinuousScale Float -> Int -> Svg msg
+outlinedText : List (Svg.Attribute msg) -> List (Svg msg) -> Svg msg
+outlinedText attrs content =
+    g []
+        [ text_
+            (List.concat
+                [ attrs
+                , [ stroke (Paint config.bgColor)
+                  , strokeWidth (px config.textOutline)
+                  , attribute "role" "presentation"
+                  ]
+                ]
+            )
+            content
+        , text_ attrs content
+        ]
+
+
+timeLabel : Float -> String
+timeLabel ms =
+    let
+        secs =
+            truncate (ms / 1000)
+
+        millis =
+            ms - toFloat (secs * 1000)
+    in
+    if millis < 0.5 then
+        String.fromInt secs ++ "s"
+
+    else if secs == 0 then
+        if ms >= 100 then
+            (String.fromFloat ms
+                |> String.left 3
+            )
+                ++ "ms"
+
+        else
+            (String.fromFloat ms
+                |> String.left 4
+            )
+                ++ "ms"
+
+    else
+        (String.fromFloat (ms / 1000)
+            |> String.left 5
+        )
+            ++ "s"
+
+
+fineTick : ContinuousScale Float -> Int -> Svg Msg
 fineTick scale ms =
     let
         yPos =

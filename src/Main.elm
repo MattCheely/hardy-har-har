@@ -22,6 +22,7 @@ type alias Model =
     , viewing : View
     , duplicateState : Duplicates.Model
     , redactState : Redact.Model
+    , timelineState : Timeline.Model
     , windowSize : ( Int, Int )
     }
 
@@ -45,6 +46,7 @@ init flags =
       , viewing = Overview
       , duplicateState = Duplicates.init
       , redactState = Redact.init
+      , timelineState = Timeline.init
       , windowSize = ( flags.width, flags.height )
       }
     , Cmd.none
@@ -61,6 +63,7 @@ type Msg
     | DuplicatesMsg Duplicates.Msg
     | RedactMsg Redact.Msg
     | SizeChange Int Int
+    | TimelineMsg Timeline.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -86,6 +89,9 @@ update msg model =
 
         RedactMsg redactMsg ->
             ( { model | redactState = Redact.update redactMsg model.redactState }, Cmd.none )
+
+        TimelineMsg timelineMsg ->
+            ( { model | timelineState = Timeline.update timelineMsg model.timelineState }, Cmd.none )
 
 
 
@@ -113,7 +119,8 @@ actionView { name, log } model =
         Overview ->
             div []
                 [ summaryView name log
-                , Timeline.view log model.windowSize
+                , Timeline.view log model.windowSize model.timelineState
+                    |> Html.map TimelineMsg
                 ]
 
         Duplicates ->
