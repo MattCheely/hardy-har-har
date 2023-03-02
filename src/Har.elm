@@ -17,6 +17,7 @@ module Har exposing
     , RequestTiming
     , Response
     , decoder
+    , header
     , page
     )
 
@@ -24,6 +25,7 @@ import Dict exposing (Dict)
 import Iso8601
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (optional, required)
+import List.Extra as ListX
 import Time exposing (Posix)
 
 
@@ -188,6 +190,16 @@ type alias RequestTiming =
     , ssl : Maybe Float
     , comment : String
     }
+
+
+
+-- HELPERS
+
+
+header : String -> { a | headers : List Header } -> Maybe Header
+header headerName call =
+    call.headers
+        |> ListX.find (\h -> String.toLower h.name == String.toLower headerName)
 
 
 page : Log -> Entry -> Maybe Page

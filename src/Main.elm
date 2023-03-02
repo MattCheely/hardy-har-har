@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser exposing (Document)
 import Browser.Events exposing (onResize)
+import Cors
 import Dict
 import Duplicates
 import Har
@@ -21,6 +22,7 @@ type alias Model =
     { shared : Shared.Model
     , viewing : View
     , duplicateState : Duplicates.Model
+    , corsState : Cors.Model
     , redactState : Redact.Model
     , timelineState : Timeline.Model
     , windowSize : ( Int, Int )
@@ -31,6 +33,7 @@ type View
     = Overview
     | LoadFile
     | Duplicates
+    | CorsErrors
     | Redact
 
 
@@ -45,6 +48,7 @@ init flags =
     ( { shared = Shared.init
       , viewing = Overview
       , duplicateState = Duplicates.init
+      , corsState = Cors.init
       , redactState = Redact.init
       , timelineState = Timeline.init
       , windowSize = ( flags.width, flags.height )
@@ -61,6 +65,7 @@ type Msg
     = SelectView View
     | SharedMsg Shared.Msg
     | DuplicatesMsg Duplicates.Msg
+    | CorsMsg Cors.Msg
     | RedactMsg Redact.Msg
     | SizeChange Int Int
     | TimelineMsg Timeline.Msg
@@ -95,6 +100,9 @@ update msg model =
             ( { model | duplicateState = Duplicates.update duplicatesMsg model.duplicateState }
             , Cmd.none
             )
+
+        CorsMsg corsMsg ->
+            ( { model | corsState = Cors.update corsMsg model.corsState }, Cmd.none )
 
         RedactMsg redactMsg ->
             ( { model | redactState = Redact.update redactMsg model.redactState }, Cmd.none )
@@ -136,6 +144,10 @@ actionView { name, log } model =
             Duplicates.view log model.duplicateState
                 |> Html.map DuplicatesMsg
 
+        CorsErrors ->
+            Cors.view log model.corsState
+                |> Html.map CorsMsg
+
         Redact ->
             Redact.view log
                 |> Html.map RedactMsg
@@ -148,6 +160,8 @@ menuView =
         , a [ onClick (SelectView Overview), class "tertiary" ] [ text "Summary" ]
         , text " | "
         , a [ onClick (SelectView Duplicates), class "tertiary" ] [ text "Duplicate Requests" ]
+        , text " | "
+        , a [ onClick (SelectView CorsErrors), class "tertiary" ] [ text "CORS Failures" ]
         , text " | "
         , a [ onClick (SelectView Redact), class "tertiary" ] [ text "Redact Data" ]
         , text " | "

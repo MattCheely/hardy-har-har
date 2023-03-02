@@ -349,3 +349,7 @@ th {
   background: #00303e;
   border-top: 1px solid #999;
 }
+
+.highlight {
+  color: #fd971f;
+}

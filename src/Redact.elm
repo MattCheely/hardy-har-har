@@ -1,5 +1,7 @@
 module Redact exposing (Model, Msg, init, update, view)
 
+-- TODO: Add a way to view/export the redacted data
+
 import Collection exposing (addToGroup)
 import Dict exposing (Dict)
 import Har exposing (Cookie, Header, QueryParam)

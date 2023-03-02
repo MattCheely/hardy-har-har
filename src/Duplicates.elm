@@ -4,6 +4,7 @@ import Collection exposing (groupBy)
 import Dict
 import Har
 import Html exposing (..)
+import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import List
 import List.Extra as List
@@ -29,6 +30,7 @@ init =
 
 type Msg
     = Focus String
+    | UnFocus
 
 
 update : Msg -> Model -> Model
@@ -36,6 +38,9 @@ update msg model =
     case msg of
         Focus action ->
             { model | focused = Just action }
+
+        UnFocus ->
+            { model | focused = Nothing }
 
 
 
@@ -89,7 +94,8 @@ detailView log action rawEntries =
             List.sortBy .time rawEntries
     in
     div []
-        [ h1 [] [ text "Duplicates of ", text action ]
+        [ div [ style "margin-top" "1rem" ] [ a [ onClick UnFocus ] [ text "< Back" ] ]
+        , h1 [ style "margin-top" "0" ] [ text "Duplicates of ", text action ]
         , table []
             [ timeRow entries
             , pageRow log entries
